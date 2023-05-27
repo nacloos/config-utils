@@ -54,9 +54,9 @@ def _extract_pos_args(input_args: Any, kwargs: Any) -> Tuple[Any, Any]:
     return output_args, kwargs
 
 
+
 from memoization import cached
 from memoization.caching.general.keys_order_dependent import make_key
-
 
 @cached(custom_key_maker=lambda _target_, _partial_, args, kwargs, full_key, node_config: make_key(node_config, {}))
 def _cached_call_target(
@@ -70,6 +70,7 @@ def _cached_call_target(
     """
     Use the node config as the cache key
     """
+
     # print("call", _target_)
     # print("\n")
     # add config to kwargs
@@ -339,7 +340,7 @@ def instantiate_node(
 
         # TODO: cleaner way to do that
         if '_wrap_' in node_keys:
-            from multisys.utils.config_utils import wrap_parser
+            from config_utils.config_utils import wrap_parser
             node = wrap_parser('_wrap_')(node)
 
         # if '_sample_' in node_keys:
