@@ -13,12 +13,22 @@ from omegaconf._utils import is_structured_config
 from hydra._internal.utils import _locate
 from hydra.errors import InstantiationException
 from hydra.types import ConvertMode, TargetConf
+from omegaconf.errors import InterpolationResolutionError
+
+from config_utils.utils import get_external_dependencies
 
 USE_CACHE = False
+CACHE_MODE = None
 
 def set_cache_usage(use_cache):
     global USE_CACHE
     USE_CACHE = use_cache
+
+
+def set_cache_mode(mode):
+    assert mode in [None, 'config', 'key']
+    global CACHE_MODE
+    CACHE_MODE = mode
 
 
 class _Keys(str, Enum):
@@ -112,13 +122,13 @@ def _call_target(
 
         raise InstantiationException(msg) from e
 
-    # TODO: ok to do that?
-    if '_selectkwargs_' in kwargs and kwargs['_selectkwargs_'] is True:
-        del kwargs['_selectkwargs_']
-        # TODO: not working if a decorator modifies the signature of a function
-        # remove kwargs that are not in the _target_ signature (i.e. the config can contain kwargs not used to instantiate the obj)
-        target_signature = inspect.signature(_target_).parameters.keys()
-        kwargs = {k: v for k, v in kwargs.items() if k in target_signature}
+    if '_selectkwargs_' in kwargs:
+        selectkwargs = kwargs.pop('_selectkwargs_')
+        if selectkwargs is True:
+            # TODO: not working if a decorator modifies the signature of a function
+            # remove kwargs that are not in the _target_ signature (i.e. the config can contain kwargs not used to instantiate the obj)
+            target_signature = inspect.signature(_target_).parameters.keys()
+            kwargs = {k: v for k, v in kwargs.items() if k in target_signature}
 
     if _partial_:
         try:
@@ -408,33 +418,82 @@ def instantiate_node(
                         )
                     kwargs[key] = _convert_node(value, convert)
 
-
             if '_config_' in kwargs and kwargs['_config_'] is True:
                 OmegaConf.resolve(node)
                 kwargs['config'] = node
                 del kwargs['_config_']
                 del node['_config_']
 
-            # TODO: use _inp_ to specify interfaces, just for information purposes right now
+            # TODO: deprecated
+            kwargs.pop('_cache_', None)
+
+            if CACHE_MODE is None:
+                use_cache = False
+
+            elif CACHE_MODE == 'config':
+                # cannot resolve the entire config here (e.g. doesn't work with _sample_)
+                if '_inp_' not in node:
+                    # compute external dependencies and store them in _inp_
+                    print("Compute ext dep")
+                    dep = get_external_dependencies(node)
+                    node['_inp_'] = OmegaConf.create(["${v:"+var+"}" for var in dep])
+                print(node["_inp_"])
+                # resolve only external dependencies
+
+                try:
+                    temp_node = node.copy()
+                    OmegaConf.resolve(temp_node._inp_)
+                    print("Caching using config:", node)
+                    # print("kwargs", kwargs)
+                    cache_key = temp_node
+                    use_cache = True
+                except InterpolationResolutionError:
+                    print("Can't resolve ext dep, don't cache")
+                    use_cache = False
+
+            elif CACHE_MODE == 'key':
+                # print("Caching using key:", full_key)
+                cache_key = full_key
+                use_cache = True
+            else:
+                raise ValueError
+
+            # _inp_ is used for resolving external dependencies, not used by target
             if '_inp_' in kwargs:
                 del kwargs['_inp_']
 
-            if '_cache_' in node:
-                _cache_ = node['_cache_']
-                del kwargs['_cache_']
-            else:
-                _cache_ = True  # use cache by default
 
-            if USE_CACHE is False:
-                res = _call_target(_target_, partial, args, kwargs, full_key)
-                return res
+            # TODO: don't support caching partial
+            if is_partial:
+                use_cache = False
 
-            if not _cache_:
-                # call target without caching
+            if not use_cache:
+                # no caching
                 res = _call_target(_target_, partial, args, kwargs, full_key)
             else:
-                res = _cached_call_target(_target_, partial, args, kwargs, full_key, node)
+                res = _cached_call_target(_target_, partial, args, kwargs, full_key, cache_key)
+
+
             return res
+
+            # if '_cache_' in node:
+            #     _cache_ = node['_cache_']
+            #     del kwargs['_cache_']
+            # else:
+            #     _cache_ = True  # use cache by default
+
+            # print(full_key)
+
+            # if USE_CACHE is False:
+            #     res = _call_target(_target_, partial, args, kwargs, full_key)
+            #     return res
+            #
+            # if not _cache_:
+            #     # call target without caching
+            #     res = _call_target(_target_, partial, args, kwargs, full_key)
+            # else:
+            #     res = _cached_call_target(_target_, partial, args, kwargs, full_key, node)
+            # return res
 
         else:
             # If ALL or PARTIAL non structured or OBJECT non structured,

@@ -16,6 +16,7 @@ import importlib
 import numpy as np
 import matplotlib.pyplot as plt
 from omegaconf import DictConfig, OmegaConf, ListConfig
+from omegaconf.errors import InterpolationKeyError, ConfigKeyError, InterpolationResolutionError
 
 
 def savefig(save_dir, filename, pdf=False, fig=None):
@@ -154,3 +155,34 @@ def return_value(**config):
 
 def return_values(config):
     return list(config.values())
+
+
+def mock_function(*args, **kwargs):
+    print("Call function with", args, kwargs)
+    return f"Result: {args}, {kwargs}"
+
+
+
+def get_external_dependencies(cfg):
+    """
+    Extract the variables that refers to values external to the config
+    """
+    assert isinstance(cfg, DictConfig)
+    cfg = cfg.copy()
+    # detach parent and try to resolve each value to identify which one depends on the parent
+    cfg._set_parent(None)
+
+    dependencies = []
+    for k in cfg.keys():
+        print("k", k, cfg._get_node(k))
+        try:
+            cfg[k]  # try to resolve the node
+        except (InterpolationKeyError, InterpolationResolutionError) as e:
+            # TODO: other way to extract the variable name than from the error msg?
+            # error msg "Interpolation key '{var_name}' not found"
+            assert len(e.msg.split("'")) == 3
+            inter_key = e.msg.split("'")[1]
+            dependencies.append(inter_key)
+            print(e.msg)
+
+    return dependencies

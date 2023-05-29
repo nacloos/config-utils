@@ -9,7 +9,7 @@ setup(
         'matplotlib',
         'numpy',
         'hydra-core',
-        # 'memoization',
+        'memoization',
         'pytest',
     ],
     description='',
