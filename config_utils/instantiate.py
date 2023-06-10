@@ -330,6 +330,25 @@ def _convert_node(node: Any, convert: Union[ConvertMode, str]) -> Any:
     return node
 
 
+def parse_node(node):
+    from config_utils.config_utils import wrap_parser, base_parser, sweep_parser, make_config_parser
+
+    node_keys = node.keys()  # if '_wrap_' in node => infinite loop
+
+    # parse _base_ recursively
+    node = make_config_parser([base_parser("_base_")])(node)
+    # if '_base_' in node_keys:
+    #     node = base_parser("_base_")(node)
+
+    if '_sweep_' in node_keys:
+        node = sweep_parser("_sweep_")(node)
+
+    if '_wrap_' in node_keys:
+        node = wrap_parser('_wrap_')(node)
+
+    return node
+
+
 def instantiate_node(
     node: Any,
     *args: Any,
@@ -346,12 +365,20 @@ def instantiate_node(
 
     # handle _wrap_ just before instantiating the node
     if OmegaConf.is_dict(node):
-        node_keys = node.keys()  # if '_wrap_' in node => infinite loop
+        node = parse_node(node)
+        # # parse _base_ recursively
+        # from config_utils.config_utils import base_parser, make_config_parser
+        # node = make_config_parser([base_parser("_base_")])(node)
 
-        # TODO: cleaner way to do that
-        if '_wrap_' in node_keys:
-            from config_utils.config_utils import wrap_parser
-            node = wrap_parser('_wrap_')(node)
+        # if '_sweep_' in node_keys:
+        #     from config_utils.config_utils import sweep_parser
+        #     node = sweep_parser("_sweep_")(node)
+        #
+        # # TODO: cleaner way to do that
+        # if '_wrap_' in node_keys:
+        #     from config_utils.config_utils import wrap_parser
+        #     node = wrap_parser('_wrap_')(node)
+
 
         # if '_sample_' in node_keys:
         #     from baba_is_ai.utils.config_parser import sample_parser
@@ -359,6 +386,7 @@ def instantiate_node(
         #     node = sample_parser(node)
         #     # node is a generator object, don't instantiate it
         #     return node
+        # node = OmegaConf.structured(node, parent=node._get_parent(), flags={"allow_objects": True})
 
     # Override parent modes from config if specified
     if OmegaConf.is_dict(node):
@@ -410,7 +438,9 @@ def instantiate_node(
                 if key not in exclude_keys:
                     if OmegaConf.is_missing(node, key) and is_partial:
                         continue
-                    # print(node, key)
+                    # print(key)
+                    # print(OmegaConf.to_yaml(node))
+                    # print("---------")
                     value = node[key]
                     if recursive:
                         value = instantiate_node(

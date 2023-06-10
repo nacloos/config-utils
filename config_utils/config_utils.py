@@ -196,152 +196,155 @@ def wrap_parser(keyword='_wrap_'):
     return _parser
 
 
+def base_parser(keyword):
+    # TODO: use hydra search path!
+    # TODO: don't work recursively with defaults
+    def maybe_load_config(cfg_path, parent_config):
+        if not isinstance(cfg_path, str):
+            return cfg_path
+
+        # base is a path to a config file relative to config_folder
+        # base = base.replace('.', '/')  # TODO: problem with ../path/
+        # config_path = (Path(config_dir) / config).with_suffix('.yaml')
+        # return OmegaConf.load(config_path)
+
+        config = hydra.compose(cfg_path)
+        while len(config.keys()) == 1 and list(config.keys())[0] == '':
+            config = config['']
+
+        # same effect as @_here_
+        for p in Path(cfg_path).parts[:-1]:
+            if p == "\\" or p == "..":  # TODO: not general
+                continue
+            config = config[p]
+
+        OmegaConf.set_struct(config, False)
+        # print(OmegaConf.to_yaml(config))
+        config._set_parent(parent_config)
+        return config
+
+    def merge_configs(base_config, config):
+        # parse the base config
+        # TODO: resolve only _base_ here?
+        base_config = make_config_parser([_parser])(base_config)
+
+        config = OmegaConf.merge(
+            base_config,
+            config
+        )
+        return config
+
+    def _parser(config):
+        if keyword not in config:
+            return config
+
+        base_config = config[keyword]
+
+        if isinstance(base_config, (ListConfig, list)):
+            if len(base_config) == 1:
+                base_config = base_config[0]
+            else:
+                base_list = base_config
+                # construct base_config by iterated merging
+                base_config = base_list[0]
+                for i in range(len(base_list)-1):
+                    base_config = maybe_load_config(base_config, parent_config=config)
+                    # base_config._set_parent(config)  # already done in maybe_load_config
+                    cfg = base_list[i+1]
+                    cfg = maybe_load_config(cfg, parent_config=config)
+
+                    base_config = merge_configs(base_config, cfg)
+
+        base_config = maybe_load_config(base_config, parent_config=config)
+        config = merge_configs(base_config, config)
+        del config[keyword]  # remove base after loading
+        return config
+    return _parser
+
+
+def sweep_parser(keyword):
+    def _parser(config):
+        if keyword not in config:
+            return config
+
+        config = config.copy()
+        sweep_config = config[keyword]
+
+        # convert list sweep specification into dict
+        if OmegaConf.is_list(sweep_config):
+            sweep_dict = {}
+            for k in sweep_config:
+                sweep_dict[k] = config[k]  # not working with dot indexes
+                del config[k]
+                # sweep_dict[k] = dict_get(config, k)
+                # dict_del(config, k)
+            sweep_config = OmegaConf.create(sweep_dict)
+
+        parent_config = config.copy()  # keep a copy of config to use as a parent in _parse_sweep_config
+
+        def _parse_sweep_config(sweep_config):
+            # TODO: might be a better way to do that
+            # resolve only one level (test_nested_sweep_with_interpolation_case1 doesn't pass if resolve the entire config)
+            sweep_config = OmegaConf.create({k: v for k, v in sweep_config.items()}, parent=parent_config)
+            # make sure that the sweep_config is also parsed when have nested _sweep_
+            sweep_config = make_config_parser([_parser])(sweep_config)
+
+            # _sweep_: param: 10 => _sweep_: param: [10]
+            for sweep_key, sweep_values in sweep_config.items():
+                if sweep_key == '_type_':
+                    continue
+
+                if not OmegaConf.is_list(sweep_values) or isinstance(sweep_values, list):
+                    sweep_values = [sweep_values]
+                sweep_config[sweep_key] = sweep_values
+
+            if '_flatten_' in sweep_config:
+                def flatten(l: list | list[list]):
+                    if not isinstance(l[0], (list, ListConfig)):
+                        return l
+                    return [item for sublist in l for item in sublist]
+
+                for key in sweep_config['_flatten_']:
+                    sweep_config[key] = flatten(sweep_config[key])
+                del sweep_config['_flatten_']
+
+            return sweep_config
+
+        del config[keyword]
+
+        # if specify _same_ directly without using _type_ in _sweep_
+        if '_same_' in sweep_config:
+            same_sweep_config = sweep_config['_same_']
+            same_sweep_config = _parse_sweep_config(same_sweep_config)
+            config = _vary_same_config(config, same_sweep_config)
+            del sweep_config['_same_']
+
+        sweep_config = _parse_sweep_config(sweep_config)
+        sweep_type = sweep_config.pop('_type_', '_product_')
+
+        # config is now a list of configs
+        if sweep_type == '_product_':
+            config = _vary_product_config(config, sweep_config)
+        elif sweep_type == '_same_':
+            config = _vary_same_config(config, sweep_config)
+        elif sweep_type == '_sum_':
+            config = _vary_sum_config(config, sweep_config)
+        else:
+            raise ValueError(sweep_type)
+
+        config = OmegaConf.create(config, parent=parent_config)
+        # for cfg in config:
+        #     del cfg[keyword]
+
+        # config = OmegaConf.create(config)
+        # OmegaConf.resolve(config)
+        return config
+    return _parser
+
+
 def parse_config(config: DictConfig, custom_parsers=None, config_dir=None) -> DictConfig:
     config_dir = CONFIG_DIR if config_dir is None else config_dir
 
-    def base_parser(keyword):
-        # TODO: use hydra search path!
-        # TODO: don't work recursively with defaults
-        def maybe_load_config(cfg_path, parent_config):
-            if not isinstance(cfg_path, str):
-                return cfg_path
-
-            # base is a path to a config file relative to config_folder
-            # base = base.replace('.', '/')  # TODO: problem with ../path/
-            # config_path = (Path(config_dir) / config).with_suffix('.yaml')
-            # return OmegaConf.load(config_path)
-
-            config = hydra.compose(cfg_path)
-            while len(config.keys()) == 1 and list(config.keys())[0] == '':
-                config = config['']
-
-            # same effect as @_here_
-            for p in Path(cfg_path).parts[:-1]:
-                if p == "\\" or p == "..":  # TODO: not general
-                    continue
-                config = config[p]
-
-            OmegaConf.set_struct(config, False)
-            # print(OmegaConf.to_yaml(config))
-            config._set_parent(parent_config)
-            return config
-
-        def merge_configs(base_config, config):
-            # parse the base config
-            # TODO: resolve only _base_ here?
-            base_config = make_config_parser([_parser])(base_config)
-
-            config = OmegaConf.merge(
-                base_config,
-                config
-            )
-            return config
-
-        def _parser(config):
-            if keyword not in config:
-                return config
-
-            base_config = config[keyword]
-
-            if isinstance(base_config, (ListConfig, list)):
-                if len(base_config) == 1:
-                    base_config = base_config[0]
-                else:
-                    base_list = base_config
-                    # construct base_config by iterated merging
-                    base_config = base_list[0]
-                    for i in range(len(base_list)-1):
-                        base_config = maybe_load_config(base_config, parent_config=config)
-                        # base_config._set_parent(config)  # already done in maybe_load_config
-                        cfg = base_list[i+1]
-                        cfg = maybe_load_config(cfg, parent_config=config)
-
-                        base_config = merge_configs(base_config, cfg)
-
-            base_config = maybe_load_config(base_config, parent_config=config)
-            config = merge_configs(base_config, config)
-            del config[keyword]  # remove base after loading
-            return config
-        return _parser
-
-    def sweep_parser(keyword):
-        def _parser(config):
-            if keyword not in config:
-                return config
-
-            config = config.copy()
-            sweep_config = config[keyword]
-
-            # convert list sweep specification into dict
-            if OmegaConf.is_list(sweep_config):
-                sweep_dict = {}
-                for k in sweep_config:
-                    sweep_dict[k] = config[k]  # not working with dot indexes
-                    del config[k]
-                    # sweep_dict[k] = dict_get(config, k)
-                    # dict_del(config, k)
-                sweep_config = OmegaConf.create(sweep_dict)
-
-            parent_config = config.copy()  # keep a copy of config to use as a parent in _parse_sweep_config
-
-            def _parse_sweep_config(sweep_config):
-                # TODO: might be a better way to do that
-                # resolve only one level (test_nested_sweep_with_interpolation_case1 doesn't pass if resolve the entire config)
-                sweep_config = OmegaConf.create({k: v for k, v in sweep_config.items()}, parent=parent_config)
-                # make sure that the sweep_config is also parsed when have nested _sweep_
-                sweep_config = make_config_parser([_parser])(sweep_config)
-
-                # _sweep_: param: 10 => _sweep_: param: [10]
-                for sweep_key, sweep_values in sweep_config.items():
-                    if sweep_key == '_type_':
-                        continue
-
-                    if not OmegaConf.is_list(sweep_values) or isinstance(sweep_values, list):
-                        sweep_values = [sweep_values]
-                    sweep_config[sweep_key] = sweep_values
-
-                if '_flatten_' in sweep_config:
-                    def flatten(l: list | list[list]):
-                        if not isinstance(l[0], (list, ListConfig)):
-                            return l
-                        return [item for sublist in l for item in sublist]
-
-                    for key in sweep_config['_flatten_']:
-                        sweep_config[key] = flatten(sweep_config[key])
-                    del sweep_config['_flatten_']
-
-                return sweep_config
-
-            del config[keyword]
-
-            # if specify _same_ directly without using _type_ in _sweep_
-            if '_same_' in sweep_config:
-                same_sweep_config = sweep_config['_same_']
-                same_sweep_config = _parse_sweep_config(same_sweep_config)
-                config = _vary_same_config(config, same_sweep_config)
-                del sweep_config['_same_']
-
-            sweep_config = _parse_sweep_config(sweep_config)
-            sweep_type = sweep_config.pop('_type_', '_product_')
-
-            # config is now a list of configs
-            if sweep_type == '_product_':
-                config = _vary_product_config(config, sweep_config)
-            elif sweep_type == '_same_':
-                config = _vary_same_config(config, sweep_config)
-            elif sweep_type == '_sum_':
-                config = _vary_sum_config(config, sweep_config)
-            else:
-                raise ValueError(sweep_type)
-
-            config = OmegaConf.create(config, parent=parent_config)
-            # for cfg in config:
-            #     del cfg[keyword]
-
-            # config = OmegaConf.create(config)
-            # OmegaConf.resolve(config)
-            return config
-        return _parser
 
     def double_underscore_to_base_parser():
         def _parser(config):
