@@ -186,3 +186,4 @@ def get_external_dependencies(cfg):
             print(e.msg)
 
     return dependencies
+

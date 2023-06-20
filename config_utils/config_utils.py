@@ -443,3 +443,16 @@ def list_to_filename(l, separator='-'):
             elem = elem.split('.')[1].split('-')[0]
         name += str(elem)
     return name
+
+
+def load_config(path, resolve=True, to_dict=True):
+    cfg = hydra.compose(config_name=path)
+    cfg = parse_config(cfg)
+
+    # env/ring_manip/config => config
+    for idx in path.split("/")[:-1]:
+        cfg = cfg[idx]
+
+    if to_dict:
+        cfg = OmegaConf.to_container(cfg, resolve=resolve)
+    return cfg
