@@ -344,7 +344,10 @@ def parse_node(node):
         node = sweep_parser("_sweep_")(node)
 
     if '_wrap_' in node_keys:
-        node = wrap_parser('_wrap_')(node)
+        if node._get_node('_wrap_') != None:
+            node = wrap_parser('_wrap_')(node)
+        else:
+            del node['_wrap_']
 
     return node
 

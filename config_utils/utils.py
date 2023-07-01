@@ -187,3 +187,12 @@ def get_external_dependencies(cfg):
 
     return dependencies
 
+
+def json_schema_from_target(target):
+    from pydantic import validate_call
+    from pydantic.json_schema import GenerateJsonSchema
+
+    tgt_validator = validate_call(target, config={"arbitrary_types_allowed": True})
+    schema = tgt_validator.__pydantic_core_schema__
+    json_schema = GenerateJsonSchema().generate(schema)
+    return json_schema
