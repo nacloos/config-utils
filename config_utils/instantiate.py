@@ -42,6 +42,10 @@ class _Keys(str, Enum):
 
 
 def _is_target(x: Any) -> bool:
+    # remove None target
+    if "_target_" in x and x["_target_"] is None:
+        del x["_target_"]
+
     if isinstance(x, dict):
         return "_target_" in x
     if OmegaConf.is_dict(x):
@@ -336,18 +340,29 @@ def parse_node(node):
     node_keys = node.keys()  # if '_wrap_' in node => infinite loop
 
     # parse _base_ recursively
-    node = make_config_parser([base_parser("_base_")])(node)
+    # node = make_config_parser([base_parser("_base_")])(node)
     # if '_base_' in node_keys:
     #     node = base_parser("_base_")(node)
 
-    if '_sweep_' in node_keys:
-        node = sweep_parser("_sweep_")(node)
+    # for baba, need to recursively parse env without recursively instantiating it
+    node = make_config_parser([sweep_parser("_sweep_")])(node)
+    # if '_sweep_' in node_keys:
+        # node = sweep_parser("_sweep_")(node)
+    # print(OmegaConf.to_yaml(node))
+    # print("================")
 
     if '_wrap_' in node_keys:
         if node._get_node('_wrap_') != None:
             node = wrap_parser('_wrap_')(node)
         else:
             del node['_wrap_']
+
+    # if '_sample_' in node_keys:
+    #     from baba_is_ai.utils.config_parser import sample_parser
+    #     print("Parse sample node", node)
+    #     node = sample_parser(node)
+    #     # node is a generator object, don't instantiate it
+    #     return node
 
     return node
 
@@ -369,27 +384,6 @@ def instantiate_node(
     # handle _wrap_ just before instantiating the node
     if OmegaConf.is_dict(node):
         node = parse_node(node)
-        # # parse _base_ recursively
-        # from config_utils.config_utils import base_parser, make_config_parser
-        # node = make_config_parser([base_parser("_base_")])(node)
-
-        # if '_sweep_' in node_keys:
-        #     from config_utils.config_utils import sweep_parser
-        #     node = sweep_parser("_sweep_")(node)
-        #
-        # # TODO: cleaner way to do that
-        # if '_wrap_' in node_keys:
-        #     from config_utils.config_utils import wrap_parser
-        #     node = wrap_parser('_wrap_')(node)
-
-
-        # if '_sample_' in node_keys:
-        #     from baba_is_ai.utils.config_parser import sample_parser
-        #     print("Parse sample node", node)
-        #     node = sample_parser(node)
-        #     # node is a generator object, don't instantiate it
-        #     return node
-        # node = OmegaConf.structured(node, parent=node._get_parent(), flags={"allow_objects": True})
 
     # Override parent modes from config if specified
     if OmegaConf.is_dict(node):
@@ -412,6 +406,7 @@ def instantiate_node(
         if node and full_key:
             msg += f"\nfull_key: {full_key}"
         raise TypeError(msg)
+
 
     # If OmegaConf list, create new list of instances if recursive
     if OmegaConf.is_list(node):
@@ -436,7 +431,7 @@ def instantiate_node(
             kwargs = {}
             is_partial = node.get("_partial_", False) or partial
 
-            # resolve one layer
+            # resolve one layer only if recursive (e.g. don't want to resolve before sweeping)
             for key in node.keys():
                 if key not in exclude_keys:
                     if OmegaConf.is_missing(node, key) and is_partial:
@@ -444,7 +439,12 @@ def instantiate_node(
                     # print(key)
                     # print(OmegaConf.to_yaml(node))
                     # print("---------")
-                    value = node[key]
+
+                    if recursive:
+                        value = node[key]  # resolve value
+                    else:
+                        value = node._get_node(key)  # don't resolve value
+
                     if recursive:
                         value = instantiate_node(
                             value, convert=convert, recursive=recursive

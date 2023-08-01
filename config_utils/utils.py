@@ -126,6 +126,12 @@ def call_attr(obj, attr, args=[], kwargs={}):
     return getattr(obj, attr)(*args, **kwargs)
 
 def get_attr(obj, attr, optional=False, **kwargs):
+    attr_list = attr.split(".")
+    if len(attr_list) > 1:
+        for a in attr_list:
+            obj = get_attr(obj, a, optional=optional, **kwargs)
+        return obj
+
     if optional:
         if not hasattr(obj, attr):
             return None

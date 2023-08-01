@@ -176,22 +176,27 @@ def wrap_parser(keyword='_wrap_'):
         return config
 
     def _parser(config):
-        if keyword in config:
-            config = config.copy()  # important to copy the config to no modify it in place
-            wrapper_config = config[keyword]
+        if keyword not in config:
+            return config
 
-            if isinstance(wrapper_config, (dict, DictConfig)) and '_target_' not in wrapper_config:
-                # list of wrappers
-                wrapper_config = list(wrapper_config.values())
+        config = config.copy()  # important to copy the config to no modify it in place
+        wrapper_config = config[keyword]
+        if wrapper_config is None:
+            del config[keyword]
+            return config
 
-            if OmegaConf.is_list(wrapper_config) or isinstance(wrapper_config, list):
-                for wrapper_cfg in wrapper_config:
-                    if wrapper_cfg is None:
-                        continue
-                    config[keyword] = wrapper_cfg
-                    config = _wrap_config(config, wrapper_cfg)
-            else:
-                config = _wrap_config(config, wrapper_config)
+        if isinstance(wrapper_config, (dict, DictConfig)) and '_target_' not in wrapper_config:
+            # list of wrappers
+            wrapper_config = list(wrapper_config.values())
+
+        if OmegaConf.is_list(wrapper_config) or isinstance(wrapper_config, list):
+            for wrapper_cfg in wrapper_config:
+                if wrapper_cfg is None:
+                    continue
+                config[keyword] = wrapper_cfg
+                config = _wrap_config(config, wrapper_cfg)
+        else:
+            config = _wrap_config(config, wrapper_config)
         return config
     return _parser
 
@@ -269,6 +274,9 @@ def sweep_parser(keyword):
 
         config = config.copy()
         sweep_config = config[keyword]
+        if sweep_config is None:
+            del config[keyword]
+            return config
 
         # convert list sweep specification into dict
         if OmegaConf.is_list(sweep_config):
@@ -428,6 +436,8 @@ def parse_config(config: DictConfig, custom_parsers=None, config_dir=None) -> Di
 
 def save_config(config, f):
     """Save config to file."""
+    if isinstance(f, str):
+        Path(f).parent.mkdir(exist_ok=True, parents=True)
     OmegaConf.save(config, f)
 
 
