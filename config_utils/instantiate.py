@@ -340,7 +340,7 @@ def parse_node(node):
     node_keys = node.keys()  # if '_wrap_' in node => infinite loop
 
     # parse _base_ recursively
-    # node = make_config_parser([base_parser("_base_")])(node)
+    node = make_config_parser([base_parser("_base_")])(node)
     # if '_base_' in node_keys:
     #     node = base_parser("_base_")(node)
 
@@ -440,10 +440,15 @@ def instantiate_node(
                     # print(OmegaConf.to_yaml(node))
                     # print("---------")
 
-                    if recursive:
-                        value = node[key]  # resolve value
-                    else:
-                        value = node._get_node(key)  # don't resolve value
+
+                    # TODO: resolve kwargs (temp fix for baba is ai rush)
+                    value = node[key]  # resolve value
+
+                    # TODO: uncomment that
+                    # if recursive:
+                    #     value = node[key]  # resolve value
+                    # else:
+                    #     value = node._get_node(key)  # don't resolve value
 
                     if recursive:
                         value = instantiate_node(
@@ -545,6 +550,7 @@ def instantiate_node(
             else:
                 # Otherwise use DictConfig and resolve interpolations lazily.
                 cfg = OmegaConf.create({}, flags={"allow_objects": True})
+
                 for key, value in node.items():
                     cfg[key] = instantiate_node(
                         value, convert=convert, recursive=recursive
