@@ -442,13 +442,13 @@ def instantiate_node(
 
 
                     # TODO: resolve kwargs (temp fix for baba is ai rush)
-                    value = node[key]  # resolve value
+                    # value = node[key]  # resolve value
 
                     # TODO: uncomment that
-                    # if recursive:
-                    #     value = node[key]  # resolve value
-                    # else:
-                    #     value = node._get_node(key)  # don't resolve value
+                    if recursive:
+                        value = node[key]  # resolve value
+                    else:
+                        value = node._get_node(key)  # don't resolve value
 
                     if recursive:
                         value = instantiate_node(
