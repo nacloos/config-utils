@@ -6,6 +6,7 @@ from pathlib import Path
 from subprocess import run
 import requests
 import os
+import stat
 import tarfile
 import platform
 
@@ -13,27 +14,35 @@ from config_utils import parse_config, instantiate
 from config_utils.config_utils import save_config
 
 
-cue_version = "v0.6.0"
-binaries_dir = (Path(__file__).parent / "../cue_binaries").resolve()
-current_platform = platform.system().lower()
-assert current_platform in ["darwin", "linux", "windows"], f"Unsupported platform: {current_platform}"
-binary_name = "cue.exe" if current_platform == "windows" else "cue"
+def init_cue():
+    cue_version = "v0.6.0"
+    binaries_dir = (Path(__file__).parent / "../cue_binaries").resolve()
+    current_platform = platform.system().lower()
+    assert current_platform in ["darwin", "linux", "windows"], f"Unsupported platform: {current_platform}"
+    binary_name = "cue.exe" if current_platform == "windows" else "cue"
 
-if platform.machine().lower() in ["x86_64", "amd64"]:
-    current_arch = "amd64"
-elif platform.machine().lower() == "arm64":
-    current_arch = "arm64"
-else:
-    raise Exception(f"Unsupported machine: {platform.machine()}")
+    if platform.machine().lower() in ["x86_64", "amd64"]:
+        current_arch = "amd64"
+    elif platform.machine().lower() == "arm64":
+        current_arch = "arm64"
+    else:
+        raise Exception(f"Unsupported machine: {platform.machine()}")
+
+    cue_binary_path = binaries_dir / f"cue_{cue_version}_{current_platform}_{current_arch}" / binary_name
+    assert cue_binary_path.exists(), "Cue binary not found. Please run `download_cue_binaries` first"
+
+    # Check if the binary has execute permissions
+    if not os.access(cue_binary_path, os.X_OK):
+        # Add execute permissions
+        current_permissions = os.stat(cue_binary_path).st_mode
+        os.chmod(cue_binary_path, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return cue_binary_path
 
 
-cue_binary_path = binaries_dir / f"cue_{cue_version}_{current_platform}_{current_arch}" / binary_name
-assert cue_binary_path.exists(), "Cue binary not found. Please run `download_cue_binaries` first"
-
+CUE_BINARY_PATH = init_cue()
 
 def run_cue_cmd(cmd_args, **kwargs):
-    print(cue_binary_path)
-    res = run([cue_binary_path] + cmd_args, **kwargs)
+    res = run([CUE_BINARY_PATH] + cmd_args, **kwargs)
     return res
 
 
@@ -49,7 +58,6 @@ def run_config(path, config_dir, run_key="run", convert=None):
     config = json.loads(res.stdout)
     # print(OmegaConf.to_yaml(config[run_key]))
     if "save_config" in config:
-
         save_config(config[run_key], config["save_config"])
 
     # convert to object when instantiating?
