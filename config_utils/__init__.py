@@ -3,9 +3,11 @@ from .omegaconf_resolvers import register_resolvers
 from .utils import savefig
 from .instantiate import instantiate
 from .dict_utils import dict_set, dict_get, dict_del, dict_in
+from config_utils.cue_utils import run_cue_cmd
 
 # register custom resolvers at package initialization (otherwise may have issues with multiprocessing)
 register_resolvers()
+
 
 
 def make(id, config_dir, instantiate_config=True, **kwargs):
@@ -24,7 +26,8 @@ def make(id, config_dir, instantiate_config=True, **kwargs):
         package = "./" + package
 
     # convert cue package to json
-    res = run(["cue", "export", package], capture_output=True, cwd=config_dir)
+    # res = run(["cue", "export", package], capture_output=True, cwd=config_dir)
+    res = run_cue_cmd(["export", package], capture_output=True, cwd=config_dir)
 
     if res.returncode == 1:
         err_msg = res.stderr.decode()

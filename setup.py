@@ -10,6 +10,7 @@ setup(
         'numpy',
         'hydra-core',
         'memoization',
+        "requests",
         'pytest',
     ],
     description='',
