@@ -19,7 +19,7 @@ current_platform = platform.system().lower()
 assert current_platform in ["darwin", "linux", "windows"], f"Unsupported platform: {current_platform}"
 binary_name = "cue.exe" if current_platform == "windows" else "cue"
 
-if platform.machine().lower() == "amd64":
+if platform.machine().lower() in ["x86_64", "amd64"]:
     current_arch = "amd64"
 elif platform.machine().lower() == "arm64":
     current_arch = "arm64"
