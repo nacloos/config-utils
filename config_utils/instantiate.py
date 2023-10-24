@@ -4,6 +4,7 @@ import copy
 import functools
 import inspect
 from enum import Enum
+from pathlib import Path
 from textwrap import dedent
 from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
 
@@ -504,6 +505,15 @@ def instantiate_node(
             # TODO: don't support caching partial
             if is_partial:
                 use_cache = False
+
+            if '_save_config_path_' in kwargs:
+                save_path = Path(kwargs.pop('_save_config_path_'))
+                _node = node.copy()
+                _node.pop('_save_config_path_')  # not included in the saved config
+
+                save_path.parent.mkdir(exist_ok=True, parents=True)
+                with open(save_path, 'w') as f:
+                    OmegaConf.save(_node, f)
 
             if not use_cache:
                 # no caching
