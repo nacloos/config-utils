@@ -23,7 +23,7 @@ def init_cue():
 
     if platform.machine().lower() in ["x86_64", "amd64"]:
         current_arch = "amd64"
-    elif platform.machine().lower() == "arm64":
+    elif platform.machine().lower() in ["arm64", "aarch64"]:
         current_arch = "arm64"
     else:
         raise Exception(f"Unsupported machine: {platform.machine()}")
