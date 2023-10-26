@@ -49,7 +49,8 @@ def run_cue_cmd(cmd_args, **kwargs):
 def run_config(path, config_dir, run_key="run", convert=None):
     # TODO: traceback for exceptions to refers to the right line in the cue file
     print("Export cue conf...")
-    res = run(["cue", "export", path], capture_output=True, cwd=config_dir)
+    # res = run(["cue", "export", path], capture_output=True, cwd=config_dir)
+    res = run_cue_cmd(["export", path], capture_output=True, cwd=config_dir)
 
     if res.returncode == 1:
         err_msg = res.stderr.decode()
