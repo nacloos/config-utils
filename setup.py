@@ -10,6 +10,7 @@ setup(
     package_data={
         "config_utils": ["cue_binaries/*"]
     },
+    include_package_data=True,
     install_requires=[
         'matplotlib',
         'numpy',
