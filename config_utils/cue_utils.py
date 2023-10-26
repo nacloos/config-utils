@@ -16,7 +16,7 @@ from config_utils.config_utils import save_config
 
 def init_cue():
     cue_version = "v0.6.0"
-    binaries_dir = (Path(__file__).parent / "../cue_binaries").resolve()
+    binaries_dir = (Path(__file__).parent / "./cue_binaries").resolve()
     current_platform = platform.system().lower()
     assert current_platform in ["darwin", "linux", "windows"], f"Unsupported platform: {current_platform}"
     binary_name = "cue.exe" if current_platform == "windows" else "cue"
