@@ -29,7 +29,7 @@ def init_cue():
         raise Exception(f"Unsupported machine: {platform.machine()}")
 
     cue_binary_path = binaries_dir / f"cue_{cue_version}_{current_platform}_{current_arch}" / binary_name
-    assert cue_binary_path.exists(), "Cue binary not found. Please run `download_cue_binaries` first"
+    assert cue_binary_path.exists(), f"Cue binary not found at path {cue_binary_path}. Please run `download_cue_binaries` first"
 
     # Check if the binary has execute permissions
     if not os.access(cue_binary_path, os.X_OK):
