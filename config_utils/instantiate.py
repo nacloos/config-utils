@@ -520,8 +520,6 @@ def instantiate_node(
                 res = _call_target(_target_, partial, args, kwargs, full_key)
             else:
                 res = _cached_call_target(_target_, partial, args, kwargs, full_key, cache_key)
-
-
             return res
 
             # if '_cache_' in node:
@@ -556,6 +554,12 @@ def instantiate_node(
                     dict_items[key] = instantiate_node(
                         value, convert=convert, recursive=recursive
                     )
+
+                # Nathan: feature added to hydra instantiate
+                if "_out_" in dict_items:
+                    # return the value of _out_ instead of the dict
+                    dict_items = dict_items["_out_"]
+
                 return dict_items
             else:
                 # Otherwise use DictConfig and resolve interpolations lazily.
@@ -569,6 +573,12 @@ def instantiate_node(
                 cfg._metadata.object_type = node._metadata.object_type
                 if convert == ConvertMode.OBJECT:
                     return OmegaConf.to_object(cfg)
+                
+                # Nathan: feature added to hydra instantiate
+                if "_out_" in cfg:
+                    # return the value of _out_ instead of the dict
+                    cfg = cfg["_out_"]
+
                 return cfg
 
     else:
