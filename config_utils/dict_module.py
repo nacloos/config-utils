@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 from time import perf_counter
 from typing import Any, Callable
@@ -30,19 +31,7 @@ class DictModule:
 
     def __call__(self, **data) -> Any:
         tic = perf_counter()
-        # use dict_get, dict_set to handle nested keys (separated by dots)
-        if isinstance(self.in_keys, (tuple, list, ListConfig)):
-            for k in self.in_keys:
-                assert dict_in(data, k), "Expected key '{}' not in input keys {}, module {}".format(k, list(data.keys()), self.module)
-            in_data = {k: dict_get(data, k) for k in self.in_keys}
-
-        elif isinstance(self.in_keys, (dict, DictConfig)):
-            for k1, k2 in self.in_keys.items():
-                assert dict_in(data, k2), "Expected key '{}' not in input keys {}, module {}".format(k2, list(data.keys()), self.module)
-            in_data = {k1: dict_get(data, k2) for k1, k2 in self.in_keys.items()}
-
-        else:
-            raise ValueError("in_keys must be list or dict, got {}".format(type(self.in_keys)))
+        in_data = self.select_items(data, self.in_keys)
 
         print(f"in_data: {(perf_counter() - tic)*1000:.2f}ms") if self.debug else None
         tic = perf_counter()
@@ -64,25 +53,53 @@ class DictModule:
 
         if out_data is None:
             assert self.out_keys is None or len(self.out_keys) == 0, self.out_keys
-
-        # TODO: dot notation for nested keys
         
         if isinstance(out_data, (dict, DictConfig)):
-             for k in self.out_keys:
-                assert k in out_data, "Expected key '{}' not in output keys {}".format(k, list(out_data.keys()))
-        
+            out_data = self.select_items(out_data, self.out_keys) 
+
         elif isinstance(out_data, (tuple, list, ListConfig)):
+            assert isinstance(self.out_keys, (tuple, list, ListConfig)), self.out_keys
             # add out_keys to list
             out_data = {k: v for k, v in zip(self.out_keys, out_data)}
         else:
             # add out_keys to single output
             assert len(self.out_keys) == 1
             out_data = {self.out_keys[0]: out_data}
-
-        assert isinstance(out_data, (dict, DictConfig)), out_data
-        assert isinstance(self.out_keys, (tuple, list, ListConfig)), self.out_keys
     
         return out_data
+
+    def select_items(self, data: dict, keys: list):
+        """
+        Selects subset of keys from data dict.
+        Args:
+            data: dict
+            keys: list of keys to output. If a key is a tuple or list [k_in, k_out], then the input key k_in is renamed to k_out.
+        """
+        if keys is None:
+            return data
+
+        assert isinstance(data, (dict, DictConfig)), data
+        assert isinstance(keys, (tuple, list, ListConfig)), keys
+
+        in_out_keys = []
+        for k in keys:
+            if isinstance(k, (tuple, list, ListConfig)):
+                assert len(k) == 2
+                k_in, k_out = k
+            else:
+                k_in, k_out = k, k
+            assert dict_in(data, k_in), "Expected key '{}' not in input keys {}, module {}".format(k_in, list(data.keys()), self.module)
+            in_out_keys.append((k_in, k_out))
+            
+        # use dict_get to handle nested keys (separated by dots)
+        data = {k_out: dict_get(data, k_in) for k_in, k_out in in_out_keys}            
+        
+        # special case for single output and None k_out
+        if len(in_out_keys) == 1 and in_out_keys[0][1] is None:
+            # return the value directly
+            data = data[None]
+
+        return data
 
     def __getattr__(self, name):
         """
