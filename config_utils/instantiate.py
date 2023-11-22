@@ -426,6 +426,11 @@ def instantiate_node(
             return lst
 
     elif OmegaConf.is_dict(node):
+        # TODO: temp
+        # {"_target_": "...", "_out_": ...} => don't instantiate "_target_" and return "_out_" instead
+        if "_out_" in node and "_target_" in node:
+            node.pop("_target_")
+
         exclude_keys = set({"_target_", "_convert_", "_recursive_", "_partial_"})
         if _is_target(node):
             _target_ = _resolve_target(node.get(_Keys.TARGET), full_key)

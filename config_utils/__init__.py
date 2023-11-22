@@ -34,6 +34,9 @@ def make(id, config_dir, instantiate_config=True, **kwargs):
         raise Exception(err_msg)
 
     config = json.loads(res.stdout)
+
+    if not dict_in(config, key):
+        raise Exception(f"Key {key} not found in config package {package}")
     config = dict_get(config, key)
     # instantiate the config at key
     if instantiate_config:
