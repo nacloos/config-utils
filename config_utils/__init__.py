@@ -10,7 +10,8 @@ register_resolvers()
 
 
 
-def make(id, config_dir, instantiate_config=True, **kwargs):
+def make(id=None, config_dir=None, package=None, key=None, instantiate_config=True, return_config=False, 
+         cached_config=None, **kwargs):
     """
     :param id: convention is "/path/to/package/key.in.config"
     :param config_dir: directory of the configs
@@ -19,27 +20,37 @@ def make(id, config_dir, instantiate_config=True, **kwargs):
     from subprocess import run
     import json
 
-    key = id.split("/")[-1]
-    package = "/".join(id.split("/")[:-1])
+    # TODO: use two separate args instead of one arg id?
+    if package is None and key is None:
+        key = id.split("/")[-1]
+        package = "/".join(id.split("/")[:-1])
 
     if not package.startswith("./"):
         package = "./" + package
 
+    # print("Package:", package)
+    # print("Key:", key)
     # convert cue package to json
-    # res = run(["cue", "export", package], capture_output=True, cwd=config_dir)
-    res = run_cue_cmd(["export", package], capture_output=True, cwd=config_dir)
+    if cached_config is None:
+        # export cue config
+        res = run_cue_cmd(["export", package], capture_output=True, cwd=config_dir)
 
-    if res.returncode == 1:
-        err_msg = res.stderr.decode()
-        raise Exception(err_msg)
+        if res.returncode == 1:
+            err_msg = res.stderr.decode()
+            raise Exception(err_msg)
 
-    config = json.loads(res.stdout)
+        config = json.loads(res.stdout)
+    else:
+        # use the given cached config
+        config = cached_config
 
-    if not dict_in(config, key):
-        raise Exception(f"Key {key} not found in config package {package}")
-    config = dict_get(config, key)
+    if key is not None:
+        if not dict_in(config, key):
+            raise Exception(f"Key {key} not found in config package {package}")
+        config = dict_get(config, key)
+
     # instantiate the config at key
-    if instantiate_config:
+    if instantiate_config and not return_config:
         return instantiate(config, **kwargs)
     else:
         return config
