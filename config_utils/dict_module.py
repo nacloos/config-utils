@@ -1,9 +1,15 @@
 from __future__ import annotations
+from functools import partial
+import inspect
+import os
 import numpy as np
 from time import perf_counter
 from typing import Any, Callable
 from omegaconf import DictConfig, ListConfig
 from config_utils.dict_utils import dict_get, dict_set, dict_in
+
+
+REPR_INDENT = "  "
 
 
 class DictModule:
@@ -70,7 +76,7 @@ class DictModule:
 
     def select_items(self, data: dict, keys: list):
         """
-        Selects subset of keys from data dict.
+        Select a subset of keys, values from data dict.
         Args:
             data: dict
             keys: list of keys to output. If a key is a tuple or list [k_in, k_out], then the input key k_in is renamed to k_out.
@@ -90,10 +96,10 @@ class DictModule:
                 k_in, k_out = k, k
             assert dict_in(data, k_in), "Expected key '{}' not in input keys {}, module {}".format(k_in, list(data.keys()), self.module)
             in_out_keys.append((k_in, k_out))
-            
+
         # use dict_get to handle nested keys (separated by dots)
-        data = {k_out: dict_get(data, k_in) for k_in, k_out in in_out_keys}            
-        
+        data = {k_out: dict_get(data, k_in) for k_in, k_out in in_out_keys}    
+
         # special case for single output and None k_out
         if len(in_out_keys) == 1 and in_out_keys[0][1] is None:
             # return the value directly
@@ -110,7 +116,39 @@ class DictModule:
         return getattr(self.analysis, name)
 
     def __repr__(self):
-        return "DictModule({}, in_keys={}, out_keys={})".format(self.module, self.in_keys, self.out_keys)
+        # return "DictModule({}, in_keys={}, out_keys={})".format(self.module, self.in_keys, self.out_keys)
+        if isinstance(self.module, partial):
+            func = self.module.func
+        elif inspect.ismethod(self.module):
+            func = self.module.__func__
+        elif inspect.isclass(self.module):
+            func = self.module.__init__
+        elif inspect.isfunction(self.module):
+            func = self.module
+        elif isinstance(self.module, Callable):
+            func = self.module.__call__
+
+        module_file = os.path.abspath(inspect.getfile(func))
+
+        indent = REPR_INDENT
+        module_str = str(self.module)
+        if len(module_str.splitlines()) > 1:
+            print("start")
+            string = module_str.splitlines()[0] + "\n"
+            for line in module_str.splitlines()[1:]:
+                print(line)
+                string += indent + line + "\n"
+            module_str = string[:-1] if len(string) > 0 else string
+            print("----")
+
+        s = ""
+        s += "DictModule(\n"
+        s += f"{indent}module={module_str}\n"
+        s += f'{indent}file="{module_file}"\n'
+        s += f"{indent}in_keys={self.in_keys}\n"
+        s += f"{indent}out_keys={self.out_keys}\n"
+        s += ")"
+        return s
 
 
 
@@ -137,8 +175,16 @@ class DictSequential:
             return outputs
 
     def __repr__(self):
+        indent = REPR_INDENT
         s = "DictSequential(\n"
         for module in self.modules:
-            s += "  {}\n".format(module)
-        s += ")"
+            module_str = str(module)
+            if len(module_str.splitlines()) > 1:
+                string = module_str.splitlines()[0] + "\n"
+                for line in module_str.splitlines()[1:]:
+                    string += indent + line + "\n"
+                module_str = string[:-1]  # remove last newline
+            s += "  " + module_str + "\n"
+        s = s[:-1]  # remove last newline
+        s += "\n)"
         return s

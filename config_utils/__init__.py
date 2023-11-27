@@ -1,3 +1,4 @@
+from omegaconf import DictConfig
 from .config_utils import parse_config
 from .omegaconf_resolvers import register_resolvers
 from .utils import savefig
@@ -48,6 +49,9 @@ def make(id=None, config_dir=None, package=None, key=None, instantiate_config=Tr
         if not dict_in(config, key):
             raise Exception(f"Key {key} not found in config package {package}")
         config = dict_get(config, key)
+
+    if not isinstance(config, (dict, DictConfig)):
+        return config
 
     # instantiate the config at key
     if instantiate_config and not return_config:

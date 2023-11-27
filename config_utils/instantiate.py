@@ -263,6 +263,11 @@ def instantiate(config: Any, *args: Any, **kwargs: Any) -> Any:
     if is_structured_config(config) or isinstance(config, (dict, list)):
         config = OmegaConf.structured(config, flags={"allow_objects": True})
 
+    # TODO(Nathan)
+    if OmegaConf.is_config(config) and "_out_" in config:
+        # args, kwargs overwrite values in "_out_" (TODO: want that behavior?)
+        return instantiate(config["_out_"], *args, **kwargs)
+
     if OmegaConf.is_dict(config):
         # Finalize config (convert targets to strings, merge with kwargs)
         config_copy = copy.deepcopy(config)
