@@ -35,9 +35,21 @@ class DictModule:
 
         self.debug = False
 
-    def __call__(self, **data) -> Any:
+    def __call__(self, *args, **data) -> Any:
         tic = perf_counter()
+        if len(args) > 0:
+            # take the first n keys of self.in_keys (where n is the number of positional arguments)
+            # and use them to name the positional arguments
+            # each elem of in_keys is either a str or a tuple (k_in, k_out)
+            in_keys_names = [k if isinstance(k, str) else k[0] for k in self.in_keys]
+            # add names to args
+            named_args = {k: v for k, v in zip(in_keys_names, args)}
+            # TODO: ok with this behavior or raise error?
+            # kwargs override args (e.g. measure(X1, X=X2, Y=Y) = measure(X2, Y=Y))
+            data = {**named_args, **data}
+
         in_data = self.select_items(data, self.in_keys)
+        # print(in_data)
 
         print(f"in_data: {(perf_counter() - tic)*1000:.2f}ms") if self.debug else None
         tic = perf_counter()
@@ -82,6 +94,7 @@ class DictModule:
             keys: list of keys to output. If a key is a tuple or list [k_in, k_out], then the input key k_in is renamed to k_out.
         """
         if keys is None:
+            # return all data
             return data
 
         assert isinstance(data, (dict, DictConfig)), data
@@ -133,13 +146,10 @@ class DictModule:
         indent = REPR_INDENT
         module_str = str(self.module)
         if len(module_str.splitlines()) > 1:
-            print("start")
             string = module_str.splitlines()[0] + "\n"
             for line in module_str.splitlines()[1:]:
-                print(line)
                 string += indent + line + "\n"
             module_str = string[:-1] if len(string) > 0 else string
-            print("----")
 
         s = ""
         s += "DictModule(\n"
@@ -149,7 +159,6 @@ class DictModule:
         s += f"{indent}out_keys={self.out_keys}\n"
         s += ")"
         return s
-
 
 
 class DictSequential:
