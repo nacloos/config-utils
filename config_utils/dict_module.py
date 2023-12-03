@@ -197,3 +197,13 @@ class DictSequential:
         s = s[:-1]  # remove last newline
         s += "\n)"
         return s
+
+    def __add__(self, other):
+        if other is None:
+            return self
+        elif isinstance(other, DictSequential):
+            return DictSequential(*self.modules, *other.modules)
+        elif isinstance(other, DictModule):
+            return DictSequential(*self.modules, other)
+        else:
+            raise TypeError("Unexpected type {}".format(type(other)))

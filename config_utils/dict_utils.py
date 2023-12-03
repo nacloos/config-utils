@@ -9,7 +9,7 @@ import os
 from config_utils.utils import winapi_path
 
 
-def update(d, u):
+def dict_update(d, u):
     """
     Recursively update dict (https://stackoverflow.com/questions/3232943/update-value-of-a-nested-dictionary-of-varying-depth)
     """
@@ -19,6 +19,7 @@ def update(d, u):
         else:
             d[k] = v
     return d
+update = dict_update  # backward compatibility
 
 
 def load_dict(dict_path, d=None):
@@ -88,7 +89,7 @@ def load_dict(dict_path, d=None):
     return d
 
 
-def _preprocess_dict(d, idx, convert2int=False):
+def _preprocess_dict(d, idx, convert2int=False, mkidx=False):
     if isinstance(idx, str):
         idx = idx.split('.')
     else:
@@ -96,6 +97,14 @@ def _preprocess_dict(d, idx, convert2int=False):
 
     # try to convert p to int for list indexing (e.g. "key.1" => ["key"][1])
     idx = [int(p) if convert2int and str.isdigit(p) else p for p in idx]
+
+    # make idx if not exist
+    if mkidx:
+        current = d
+        for p in idx:
+            if p not in current:
+                current[p] = {}
+            current = current[p]
 
     return d, idx
 

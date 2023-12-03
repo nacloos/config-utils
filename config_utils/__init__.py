@@ -5,7 +5,7 @@ from .config_utils import parse_config
 from .omegaconf_resolvers import register_resolvers
 from .utils import savefig
 from .instantiate import instantiate
-from .dict_utils import dict_set, dict_get, dict_del, dict_in
+from .dict_utils import dict_set, dict_get, dict_del, dict_in, dict_update
 from config_utils.cue_utils import run_cue_cmd
 from .dict_module import DictModule, DictSequential
 
