@@ -1,5 +1,5 @@
 from omegaconf import DictConfig
-import jmespath
+# import jmespath
 
 from .config_utils import parse_config
 from .omegaconf_resolvers import register_resolvers
