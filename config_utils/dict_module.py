@@ -71,7 +71,7 @@ class DictModule:
 
         if out_data is None:
             assert self.out_keys is None or len(self.out_keys) == 0, self.out_keys
-        
+
         if isinstance(out_data, (dict, DictConfig)):
             out_data = self.select_items(out_data, self.out_keys) 
 
@@ -83,7 +83,7 @@ class DictModule:
             # add out_keys to single output
             assert len(self.out_keys) == 1
             out_data = {self.out_keys[0]: out_data}
-    
+
         return out_data
 
     def select_items(self, data: dict, keys: list):

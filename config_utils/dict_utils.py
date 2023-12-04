@@ -93,7 +93,7 @@ def _preprocess_dict(d, idx, convert2int=False, mkidx=False):
     if isinstance(idx, str):
         idx = idx.split('.')
     else:
-        assert isinstance(idx, list)
+        assert isinstance(idx, list), f"idx must be a list or str, got {type(idx)}"
 
     # try to convert p to int for list indexing (e.g. "key.1" => ["key"][1])
     idx = [int(p) if convert2int and str.isdigit(p) else p for p in idx]
