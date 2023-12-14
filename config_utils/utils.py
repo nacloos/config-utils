@@ -12,6 +12,7 @@ from functools import wraps
 from pathlib import Path
 import traceback
 import importlib
+from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -113,11 +114,36 @@ def sample(dist_type: str, size: int):
     assert isinstance(dist_type, list)
 
 
+# def download_and_unzip(url, extract_to='.'):
+#     # https://gist.github.com/hantoine/c4fc70b32c2d163f604a8dc2a050d5f6
+#     print("Downloading: {}".format(url))
+#     http_response = urlopen(url)
+#     zipfile = ZipFile(BytesIO(http_response.read()))
+#     zipfile.extractall(path=extract_to)
+
 def download_and_unzip(url, extract_to='.'):
-    # https://gist.github.com/hantoine/c4fc70b32c2d163f604a8dc2a050d5f6
     print("Downloading: {}".format(url))
+    # Open the URL
     http_response = urlopen(url)
-    zipfile = ZipFile(BytesIO(http_response.read()))
+
+    # Initialize a BytesIO object
+    buffer = BytesIO()
+    
+    # Initialize the progress bar without a total size but showing the unit as bytes
+    with tqdm(unit='B', unit_scale=True, unit_divisor=1024, desc=url.split('/')[-1], leave=True, ncols=100, ascii=True) as pbar:
+        # Read the data in chunks
+        chunk_size = 1024
+        bytes_downloaded = 0
+        while True:
+            chunk = http_response.read(chunk_size)
+            if not chunk:  # End of file
+                break
+            buffer.write(chunk)
+            bytes_downloaded += len(chunk)
+            pbar.update(len(chunk))  # Update progress bar by the size of the chunk downloaded
+
+    # Use the buffer with the ZipFile class
+    zipfile = ZipFile(buffer)
     zipfile.extractall(path=extract_to)
 
 

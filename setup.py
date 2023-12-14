@@ -18,6 +18,7 @@ setup(
         'jmespath',
         'memoization',
         'requests',
+        'tqdm',
         'pytest',
     ],
     description='',
