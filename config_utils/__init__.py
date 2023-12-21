@@ -15,7 +15,7 @@ register_resolvers()
 
 
 def make(id=None, config_dir=None, package=None, key=None, instantiate_config=True, return_config=False, 
-         cached_config=None, **kwargs):
+         cached_config=None, pkg_separator='/', **kwargs):
     """
     :param id: convention is "/path/to/package/key.in.config"
     :param config_dir: directory of the configs
@@ -26,8 +26,8 @@ def make(id=None, config_dir=None, package=None, key=None, instantiate_config=Tr
 
     # TODO: use two separate args instead of one arg id?
     if package is None and key is None and cached_config is None:
-        key = id.split("/")[-1]
-        package = "/".join(id.split("/")[:-1])
+        key = id.split(pkg_separator)[-1]
+        package = "/".join(id.split(pkg_separator)[:-1])
 
     if package is not None and not package.startswith("./"):
         package = "./" + package
